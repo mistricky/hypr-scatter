@@ -58,7 +58,8 @@ python3 tests/live_check.py
 - Closed windows are skipped during restoration. Windows moved to another
   workspace, tiled, or made fullscreen during the overview are left alone.
   After switching workspaces, the next desktop/window click or Escape restores
-  the saved overview. Original stacking is approximated from focus history.
+  the saved overview. Original stacking is saved from Hyprland's bottom-to-top
+  client order and restored, then only the selected window is raised.
 
 ## Implementation
 

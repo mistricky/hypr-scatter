@@ -130,9 +130,8 @@ class Scatter:
                 continue
             commands.extend(geometry(window, [*window["at"], *window["size"]]))
             retained.append(window)
-        # Restore relative stacking using the saved focus history, then raise
-        # the user's choice last. Window focus itself is explicit, not inferred.
-        for window in sorted(retained, key=lambda w: w["focusHistoryID"], reverse=True):
+        # The saved clients order is bottom-to-top, independent of focus history.
+        for window in retained:
             commands.append("alterzorder top,address:" + window["address"])
         # Cancellation restores stacking without focusing a window: focuswindow
         # warps the cursor into the target when cursor:no_warps is disabled.
@@ -170,9 +169,8 @@ class Scatter:
                 self.restore(state, clients)
                 return
             # Query live geometry: clients can enforce their own minimum size.
-            hit = sorted((w for w in visible if contains(
-                (*w["at"], *w["size"]), point, 6)), key=lambda w: w["focusHistoryID"])
-            self.restore(state, clients, hit[0]["address"] if hit else None)
+            hit = [w for w in visible if contains((*w["at"], *w["size"]), point, 6)]
+            self.restore(state, clients, hit[-1]["address"] if hit else None)
             return
         if action == "click" and any(contains((*w["at"], *w["size"]), point, 6) for w in visible):
             return
@@ -182,13 +180,13 @@ class Scatter:
                    and not w.get("grouped") and not w.get("pinned")]
         if len(windows) < 2:
             return
-        windows.sort(key=lambda w: (w["at"][1], w["at"][0], w["address"]))
         state = {"windows": windows, "monitor": monitor["id"],
                  "workspace": monitor["activeWorkspace"]["id"],
                  "ready_at": time.monotonic() + 0.4}
         self.save(state)  # Write recovery information before touching any window.
         commands = []
-        for window, rect in zip(windows, grid(windows, workarea(monitor))):
+        layout = sorted(windows, key=lambda w: (w["at"][1], w["at"][0], w["address"]))
+        for window, rect in zip(layout, grid(layout, workarea(monitor))):
             commands.extend(geometry(window, rect))
         try:
             batch(commands)

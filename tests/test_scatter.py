@@ -107,6 +107,28 @@ class InteractionTests(unittest.TestCase):
                 self.assertEqual(self.calls[-2:], [
                     "alterzorder top,address:0x1", "alterzorder top,address:0x2"])
 
+    def test_restore_uses_actual_stack_not_geometry_or_focus_history(self):
+        for selected in (None, "0x3"):
+            with self.subTest(selected=selected):
+                # Bottom-to-top order deliberately differs from both sorts.
+                self.windows = [window("0x3", 600, 600, history=0),
+                                window("0x1", 200, 200, history=2),
+                                window("0x2", 400, 400, history=1)]
+                original = copy.deepcopy(self.windows)
+                self.engine.run("toggle")
+                state = json.loads(self.path.read_text())
+                self.assertEqual(state["windows"], original)
+                self.calls.clear()
+                self.engine.restore(state, self.windows, selected)
+                expected = ["alterzorder top,address:" + w["address"] for w in original]
+                if selected:
+                    expected += ["focuswindow address:" + selected,
+                                 "alterzorder top,address:" + selected]
+                self.assertEqual(self.calls[6:], expected)
+                for w in original:
+                    for command in scatter.geometry(w, [*w["at"], *w["size"]]):
+                        self.assertIn(command, self.calls)
+
     def test_closed_or_moved_window_is_not_restored(self):
         self.engine.run("toggle")
         self.windows.pop()

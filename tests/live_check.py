@@ -35,13 +35,17 @@ def main():
         scatter.Scatter(state_path).restore(state, list(after.values()), selected)
         time.sleep(0.8)
         assert scatter.hypr("activewindow", json_result=True)["address"] == selected
-        restored = {w["address"]: w for w in scatter.hypr("clients", json_result=True)}
+        restored_clients = scatter.hypr("clients", json_result=True)
+        expected_stack = [w["address"] for w in before
+                          if w["address"] in addresses and w["address"] != selected] + [selected]
+        assert [w["address"] for w in restored_clients if w["address"] in addresses] == expected_stack
+        restored = {w["address"]: w for w in restored_clients}
         for old in before:
             if old["address"] in addresses:
                 new = restored[old["address"]]
                 assert old["at"] == new["at"], (old["address"], "position", old["at"], new["at"])
                 assert old["size"] == new["size"], (old["address"], "size", old["size"], new["size"])
-        print(f"PASS: {len(addresses)} live windows spread without overlap, exact geometry restored, selection focused and raised")
+        print(f"PASS: {len(addresses)} live windows spread without overlap, exact geometry and relative stack restored, selection focused and raised")
     finally:
         subprocess.run([sys.executable, str(root / "scatter.py"), "restore"], check=True)
         if original_focus:
