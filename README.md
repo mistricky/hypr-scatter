@@ -24,6 +24,12 @@ Add this line to `~/.config/hypr/hyprland.conf`, then run `hyprctl reload`:
 source = /home/mist/Repositories/hypr-scatter/hypr-scatter.conf
 ```
 
+For Noctalia, link `noctalia-plugin/` to
+`~/.config/noctalia/plugins/hypr-scatter`, enable `hypr-scatter` in
+`~/.config/noctalia/plugins.json`, and restart Noctalia. This local plugin exposes
+only whether a panel is open. If its IPC query fails, clicks are ignored and an
+error is reported instead of rearranging windows.
+
 The supplied bindings use this project's absolute local path. Update the paths
 if moving the project. To disable, restore first, remove the source line, and
 reload Hyprland.
@@ -50,8 +56,10 @@ python3 tests/live_check.py
   can enforce minimum sizes; very crowded grids can consequently overlap.
 - Clicks are non-consuming: selecting a window can also activate the control
   under the pointer. Prefer clicking a neutral area of the window.
-- Top/overlay layer rectangles are excluded. The local Noctalia transparent
-  background is exempt; its separate bar/popup surfaces remain excluded.
+- Top/overlay layer rectangles are excluded. For Noctalia's shared background
+  surface, the local plugin's `panelOpen` IPC checks for an open panel.
+  Panel interactions (including outside clicks to dismiss) are ignored. The
+  mouse press records this before a button can close the panel on release.
 - Original geometry is saved atomically under `$XDG_RUNTIME_DIR/hypr-scatter/`
   before moving anything. Concurrent clicks are serialized. Clicks during the
   initial 400ms transition are ignored.

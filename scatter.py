@@ -93,22 +93,34 @@ def visible_clients(clients, monitor):
 
 def on_panel(layers, monitor, point):
     levels = layers.get(monitor["name"], {}).get("levels", {})
+    noctalia_background = False
     for level in ("2", "3"):
         for layer in levels.get(level, []):
-            # Noctalia's transparent background covers the monitor; its actual
-            # bar and popup surfaces are separate and must still block clicks.
             if layer.get("namespace", "").startswith("noctalia-background-"):
+                noctalia_background = True
                 continue
             if layer.get("alpha", 1) > 0 and contains(
                 (layer["x"], layer["y"], layer["w"], layer["h"]), point
             ):
                 return True
+    if noctalia_background:
+        # Noctalia hosts panels in its full-screen background surface. While a
+        # panel is open, that surface also consumes outside clicks to dismiss it.
+        result = subprocess.run(
+            ["qs", "-c", "noctalia-shell", "ipc", "call", "plugin:hypr-scatter", "panelOpen"],
+            check=True, text=True, capture_output=True, timeout=5,
+        )
+        panel_open = json.loads(result.stdout)
+        if not isinstance(panel_open, bool):
+            raise ValueError("Noctalia panelOpen must return a boolean")
+        return panel_open
     return False
 
 
 class Scatter:
     def __init__(self, state_file):
         self.path = state_file
+        self.press_path = state_file.with_suffix(".press")
 
     def save(self, state):
         temp = self.path.with_suffix(".tmp")
@@ -153,10 +165,22 @@ class Scatter:
             if state:
                 self.restore(state, clients)
             return
+        if action == "click" and self.press_path.exists():
+            blocked = self.press_path.read_text() == "blocked"
+            self.press_path.unlink()
+            if blocked:
+                return
         monitors = hypr("monitors", json_result=True)
         cursor = hypr("cursorpos", json_result=True)
         point = cursor["x"], cursor["y"]
         monitor = next((m for m in monitors if contains(workarea(m), point)), None)
+        if action == "press":
+            # Fail closed if querying the shell fails; a release must not turn a
+            # panel interaction into a desktop click after the panel disappears.
+            self.press_path.write_text("blocked")
+            if monitor is not None and not on_panel(hypr("layers", json_result=True), monitor, point):
+                self.press_path.write_text("desktop")
+            return
         if monitor is None:
             return
         visible = visible_clients(clients, monitor)
@@ -197,7 +221,7 @@ class Scatter:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["click", "toggle", "restore", "status"])
+    parser.add_argument("action", choices=["press", "click", "toggle", "restore", "status"])
     args = parser.parse_args()
     runtime = Path(os.environ["XDG_RUNTIME_DIR"]) / "hypr-scatter"
     runtime.mkdir(mode=0o700, exist_ok=True)

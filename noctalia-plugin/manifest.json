@@ -1,0 +1,9 @@
+{
+  "id": "hypr-scatter",
+  "name": "Hypr Scatter",
+  "version": "1.0.0",
+  "minNoctaliaVersion": "3.6.0",
+  "author": "hypr-scatter",
+  "description": "Expose panel state for desktop click detection.",
+  "entryPoints": {"main": "Main.qml"}
+}

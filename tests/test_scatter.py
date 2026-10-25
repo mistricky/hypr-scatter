@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -106,6 +107,42 @@ class InteractionTests(unittest.TestCase):
                 self.assertFalse(self.path.exists())
                 self.assertEqual(self.calls[-2:], [
                     "alterzorder top,address:0x1", "alterzorder top,address:0x2"])
+
+    def test_noctalia_panel_click_stays_blocked_after_panel_closes(self):
+        self.layers = {"DP-8": {"levels": {"2": [dict(
+            x=0, y=0, w=2560, h=1440, alpha=1,
+            namespace="noctalia-background-DP-8")]}}}
+        with patch("scatter.subprocess.run", return_value=subprocess.CompletedProcess(
+            [], 0, "true", ""
+        )):
+            self.engine.run("press")
+        # A button can close its panel before the release binding runs.
+        self.layers = {}
+        self.engine.run("click")
+        self.assertFalse(self.path.exists())
+        self.assertEqual(self.calls, [])
+
+    def test_noctalia_background_allows_desktop_click_with_no_panel(self):
+        self.layers = {"DP-8": {"levels": {"2": [dict(
+            x=0, y=0, w=2560, h=1440, alpha=1,
+            namespace="noctalia-background-DP-8")]}}}
+        with patch("scatter.subprocess.run", return_value=subprocess.CompletedProcess(
+            [], 0, "false", ""
+        )):
+            self.engine.run("press")
+            self.engine.run("click")
+        self.assertTrue(self.path.exists())
+
+    def test_panel_press_does_not_cancel_existing_overview(self):
+        self.engine.run("toggle")
+        saved = self.path.read_text()
+        self.layers = {"DP-8": {"levels": {"3": [dict(x=2400, y=1200, w=160, h=240)]}}}
+        self.engine.run("press")
+        self.layers = {}
+        self.calls.clear()
+        self.engine.run("click")
+        self.assertEqual(self.path.read_text(), saved)
+        self.assertEqual(self.calls, [])
 
     def test_restore_uses_actual_stack_not_geometry_or_focus_history(self):
         for selected in (None, "0x3"):
